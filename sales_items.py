@@ -1,13 +1,6 @@
-# sale_items.py operations
-
-# create_table() → Create the sale_items table
-
-# add_item(sale_id, product_id, quantity, price) → Add a product to a sale
-
-# # get_items_by_sale(sale_id) → Fetch all products for a specific sale
-
-import psycopg2
+"""Sale item operations with inventory and sale-total consistency."""
 from Database import conn
+
 
 class SaleItem:
     def __init__(self, sale_id, product_id, quantity, price):
@@ -15,69 +8,102 @@ class SaleItem:
         self.product_id = product_id
         self.quantity = quantity
         self.price = price
-        
+
+    @staticmethod
     def create_table():
         cur = conn.cursor()
-        cur.execute('''CREATE TABLE IF NOT EXISTS sale_items (
-                        id SERIAL PRIMARY KEY,
-                        sale_id INTEGER NOT NULL,
-                        product_id INTEGER NOT NULL,
-                        quantity INTEGER NOT NULL,
-                        price DECIMAL(10, 2) NOT NULL
-                    )''')
-        conn.commit()
-        cur.close()
-    def add_item(self,sale_id, product_id, quantity, price):
+        try:
+            cur.execute("""CREATE TABLE IF NOT EXISTS sale_items (
+                id SERIAL PRIMARY KEY,
+                sale_id INTEGER NOT NULL REFERENCES sales(id) ON DELETE CASCADE,
+                product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+                quantity INTEGER NOT NULL CHECK (quantity > 0),
+                price DECIMAL(10, 2) NOT NULL CHECK (price >= 0)
+            )""")
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            cur.close()
+
+    @staticmethod
+    def add_item(sale_id, product_id, quantity, price):
+        quantity = int(quantity)
+        price = float(price)
+        if quantity <= 0:
+            raise ValueError("Quantity must be greater than zero.")
+        if price < 0:
+            raise ValueError("Price cannot be negative.")
+
         cur = conn.cursor()
-        cur.execute('''INSERT INTO sale_items (sale_id, product_id, quantity, price)
-                       VALUES (%s, %s, %s, %s)''',
-                    (sale_id, product_id, quantity, price))
-        conn.commit()
-        cur.close()
-        print("Item added to sale")
-        
-    def get_items_by_sale(self,sale_id):
+        try:
+            cur.execute("SELECT id FROM sales WHERE id = %s FOR UPDATE", (sale_id,))
+            if cur.fetchone() is None:
+                raise ValueError("Sale was not found.")
+
+            cur.execute("SELECT quantity FROM products WHERE id = %s FOR UPDATE", (product_id,))
+            product = cur.fetchone()
+            if product is None:
+                raise ValueError("Product was not found.")
+            if product[0] < quantity:
+                raise ValueError("Insufficient stock for the requested quantity.")
+
+            cur.execute(
+                "INSERT INTO sale_items (sale_id, product_id, quantity, price) VALUES (%s, %s, %s, %s)",
+                (sale_id, product_id, quantity, price),
+            )
+            cur.execute(
+                "UPDATE products SET quantity = quantity - %s WHERE id = %s",
+                (quantity, product_id),
+            )
+            cur.execute(
+                "UPDATE sales SET total_amount = total_amount + %s WHERE id = %s",
+                (quantity * price, sale_id),
+            )
+            conn.commit()
+            return True
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            cur.close()
+
+    @staticmethod
+    def get_items_by_sale(sale_id):
         cur = conn.cursor()
-        cur.execute('SELECT * FROM sale_items WHERE sale_id = %s', (sale_id,))
-        items = cur.fetchall()
-        cur.close()
-        return items
-    def view_sale_items(self, sale_id):
-        cur = conn.cursor()
-        cur.execute('SELECT * FROM sale_items WHERE sale_id = %s', (sale_id,))
-        items = cur.fetchall()
-        for item in items:
-            print(item)
-        cur.close()
+        try:
+            cur.execute("SELECT * FROM sale_items WHERE sale_id = %s ORDER BY id", (sale_id,))
+            return cur.fetchall()
+        finally:
+            cur.close()
+
+    @staticmethod
+    def view_sale_items(sale_id):
+        items = SaleItem.get_items_by_sale(sale_id)
         total_amount = 0
         for item in items:
-            total_amount += item[3] * item[4]  # quantity * price
+            print(item)
+            total_amount += item[3] * item[4]
         print("Total Amount for Sale ID", sale_id, ":", total_amount)
         return total_amount
+
+    @staticmethod
     def sale_item_menu():
         while True:
-            print("1. Create Table")
-            print("2. Add Item to Sale") 
-            print("3. View Sale Items")
-            print("0. Exit")
-            choice = input("Enter choice: ")
-            if choice == '1':
-                SaleItem.create_table()
-                print("Table created")
-            elif choice == '2':
-                sale_id = int(input("Enter sale id: "))
-                product_id = int(input("Enter product id: "))
-                quantity = int(input("Enter quantity: "))
-                price = float(input("Enter price: "))
-                SaleItem.add_item(sale_id, product_id, quantity, price)
-                print("Item added to sale")
-            elif choice == '3':
-                sale_id = int(input("Enter sale id: "))
-                total_amount = SaleItem.view_sale_items(sale_id)
-                print("Total Amount:", total_amount)
-            elif choice == '0':
-                print("Exiting...")
+            print("1. Add Item to Sale\n2. View Sale Items\n0. Exit")
+            choice = input("Enter choice: ").strip()
+            if choice == "1":
+                SaleItem.add_item(
+                    int(input("Enter sale id: ")),
+                    int(input("Enter product id: ")),
+                    int(input("Enter quantity: ")),
+                    float(input("Enter price: ")),
+                )
+                print("Item added and inventory updated")
+            elif choice == "2":
+                SaleItem.view_sale_items(int(input("Enter sale id: ")))
+            elif choice == "0":
                 break
             else:
                 print("Invalid choice. Please try again.")
-
