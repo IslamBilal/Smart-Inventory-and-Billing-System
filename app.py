@@ -23,10 +23,10 @@ def initialize_tables():
         
         # Fix sequences for all tables
         cur = conn.cursor()
-        cur.execute("SELECT setval('customers_id_seq', (SELECT MAX(id) FROM customers))")
-        cur.execute("SELECT setval('products_id_seq', (SELECT MAX(id) FROM products))")
-        cur.execute("SELECT setval('sales_id_seq', (SELECT MAX(id) FROM sales))")
-        cur.execute("SELECT setval('sale_items_id_seq', (SELECT MAX(id) FROM sale_items))")
+        cur.execute("SELECT setval('customers_id_seq', COALESCE((SELECT MAX(id) FROM customers), 1), EXISTS (SELECT 1 FROM customers))")
+        cur.execute("SELECT setval('products_id_seq', COALESCE((SELECT MAX(id) FROM products), 1), EXISTS (SELECT 1 FROM products))")
+        cur.execute("SELECT setval('sales_id_seq', COALESCE((SELECT MAX(id) FROM sales), 1), EXISTS (SELECT 1 FROM sales))")
+        cur.execute("SELECT setval('sale_items_id_seq', COALESCE((SELECT MAX(id) FROM sale_items), 1), EXISTS (SELECT 1 FROM sale_items))")
         conn.commit()
         cur.close()
         
@@ -356,25 +356,14 @@ elif menu_option == "Sales Management":
                                         
                                         if submitted_item:
                                             try:
-                                                # Add item to sale
-                                                cur = conn.cursor()
-                                                cur.execute('''INSERT INTO sale_items (sale_id, product_id, quantity, price)
-                                                               VALUES (%s, %s, %s, %s)''',
-                                                            (st.session_state.new_sale_id, product_id, quantity, price))
-                                                conn.commit()
-                                                cur.close()
-                                                
-                                                # Refresh sequence
-                                                cur = conn.cursor()
-                                                cur.execute("SELECT setval('sale_items_id_seq', (SELECT MAX(id) FROM sale_items))")
-                                                conn.commit()
-                                                cur.close()
-                                                
-                                                # Update product quantity
-                                                new_quantity = product_details[4] - quantity
-                                                Product.update_product(product_id, quantity=new_quantity)
-                                                
-                                                st.success("Item added to sale successfully!")
+                                                # Insert the sale item, reduce stock, and update the sale total atomically.
+                                                SaleItem.add_item(
+                                                    st.session_state.new_sale_id,
+                                                    product_id,
+                                                    quantity,
+                                                    price,
+                                                )
+                                                st.success("Item added to sale and inventory updated successfully!")
                                             except Exception as e:
                                                 st.error(f"Error adding item to sale: {e}")
                                             

@@ -1,92 +1,149 @@
 # Smart Inventory and Billing System
 
-A Python-based inventory and billing application with a Streamlit web interface and a PostgreSQL database. It provides management of customers, products, sales, and sale items, along with dashboard metrics and sales reporting.
+A Python application for managing customers, products, stock, and sales. It includes a Streamlit web interface, a command-line interface, and a PostgreSQL database.
 
 ## Features
-- **Dashboard:** Displays total customers, products, and sales.
-- **Customer management:** Add, view, update, and delete customer records.
-- **Product management:** Add, view, update, and delete products, including price and stock quantity.
-- **Sales management:** Record and view sales and generate bills from sale items.
-- **Analytics:** Includes date-range sales totals, top-selling product queries, and sales-by-customer queries.
-- **Two entry points:** A Streamlit interface (`app.py`) and a terminal menu (`main.py`).
+
+- **Dashboard:** Displays customer, product, and sales counts.
+- **Customer management:** Create, view, update, search, and delete customers.
+- **Product management:** Create, view, update, and delete products with prices and stock quantities.
+- **Sales and billing:** Create sales, add sale items, and generate bills.
+- **Inventory control:** Reduces stock when a sale item is added and checks that enough stock is available.
+- **Analytics:** Sales summaries, date-range reports, top-selling products, low-stock alerts, and customer purchase history.
+- **Two interfaces:** Streamlit web application and a terminal-based menu.
 
 ## Technology Stack
-- Python
+
+- Python 3.9+
 - Streamlit
 - PostgreSQL
 - psycopg2
+- python-dotenv
 - SQL
 
 ## Project Structure
+
 ```text
 Smart-Inventory-and-Billing-System/
-├── app.py          # Streamlit web application and dashboard
-├── main.py         # Command-line application entry point
-├── Database.py     # PostgreSQL connection configuration
-├── customers.py    # Customer table and CRUD operations
-├── products.py     # Product table and CRUD operations
-├── sales.py        # Sales operations, billing, and analytical queries
-├── sales_items.py  # Sale-item operations
+├── app.py             # Streamlit application
+├── main.py            # Command-line entry point
+├── Database.py        # PostgreSQL connection configuration
+├── customers.py       # Customer operations
+├── products.py        # Product and inventory operations
+├── sales.py           # Sales and reporting operations
+├── sales_items.py     # Sale item and stock transaction logic
+├── requirements.txt   # Python dependencies
+├── .env.example       # Safe database configuration template
 └── README.md
 ```
 
 ## Prerequisites
+
 - Python 3.9 or later
 - PostgreSQL installed and running
-- A PostgreSQL database created for the application
+- A PostgreSQL database named `ecommerce`
 
-## Setup
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/IslamBilal/Smart-Inventory-and-Billing-System.git
-   cd Smart-Inventory-and-Billing-System
-   ```
-2. Create and activate a virtual environment:
-   **Windows**
-   ```bash
-   python -m venv venv
-   venv\Scripts\activate
-   ```
-   **macOS/Linux**
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate
-   ```
-3. Install dependencies:
-   ```bash
-   pip install streamlit psycopg2-binary
-   ```
-4. Create a PostgreSQL database (for example, `ecommerce`) and configure the connection settings in `Database.py` for your local host, database, username, password, and port.
-5. Run the Streamlit application:
-   ```bash
-   streamlit run app.py
-   ```
-   Or run the command-line version:
-   ```bash
-   python main.py
-   ```
-The Streamlit application attempts to initialize the required tables when it starts.
+## Installation and Setup
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/IslamBilal/Smart-Inventory-and-Billing-System.git
+cd Smart-Inventory-and-Billing-System
+```
+
+### 2. Create and activate a virtual environment
+
+Windows:
+```bash
+python -m venv .venv
+.venv\Scripts\activate
+```
+
+macOS/Linux:
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+### 3. Install dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Configure PostgreSQL
+
+Create a database named `ecommerce` in PostgreSQL. Copy the example configuration file:
+
+Windows:
+```powershell
+Copy-Item .env.example .env
+```
+
+macOS/Linux:
+```bash
+cp .env.example .env
+```
+
+Edit `.env` with your local database settings:
+
+- `DB_HOST`
+- `DB_NAME`
+- `DB_USER`
+- `DB_PASSWORD`
+- `DB_PORT`
+
+The real `.env` file is ignored by Git. **Never commit database passwords or secrets.**
+
+### 5. Run the Streamlit application
+
+```bash
+streamlit run app.py
+```
+
+### 6. Run the command-line application
+
+```bash
+python main.py
+```
+
+The application creates the required tables when it starts. For a new database, start with the Streamlit application or use the table-creation options in the CLI.
 
 ## Database Tables
-- `customers`: Customer names and contact information.
-- `products`: Product names, descriptions, prices, and available quantities.
-- `sales`: Customer reference, sale date, and total amount.
-- `sale_items`: Sale reference, product reference, quantity, and unit price.
 
-## Notes and Limitations
-- The application expects a locally accessible PostgreSQL database; database setup is not automated.
-- Configure database credentials locally. Do not commit real passwords, API keys, or other secrets to GitHub. Prefer environment variables or a local, untracked configuration file for credentials.
-- The repository contains both a Streamlit interface and a separate command-line interface. Some operations and reporting functions may need further integration and testing.
-- This README describes functionality visible in the repository; it does not claim that every workflow has been fully tested.
+| Table | Purpose |
+|---|---|
+| `customers` | Customer names and contact information |
+| `products` | Product details, prices, and available stock |
+| `sales` | Sale date, customer, and total amount |
+| `sale_items` | Products, quantities, and unit prices associated with a sale |
+
+## Important Implementation Notes
+
+- Customer and product update operations use parameterized SQL values.
+- Sale-item insertion, stock reduction, and sale-total updates are handled in one database transaction.
+- The application checks product availability before reducing inventory.
+- Foreign-key and check constraints are included in the table definitions for newly created tables. Existing databases created with older table definitions may need a schema migration to gain those constraints.
+- The database connection is currently shared by the imported modules. A connection pool or per-operation connection management would be a useful next architectural improvement.
+
+## Limitations
+
+- The project requires a locally configured PostgreSQL database.
+- The Streamlit interface and CLI should be tested against a clean database before deployment.
+- This is a learning project, not a production inventory or accounting platform.
+- No automated test suite is currently included.
 
 ## Future Improvements
-- Move database credentials to environment variables.
-- Add database foreign-key constraints and stronger input validation.
-- Use parameterized SQL for all update operations.
-- Add automated tests and clearer error handling.
-- Improve stock validation and transaction handling during billing.
-- Add screenshots or a short demo of the Streamlit interface.
+
+- Add automated unit and integration tests.
+- Add database migrations for existing installations.
+- Introduce connection pooling and stronger transaction boundaries for every workflow.
+- Add user authentication and role-based permissions.
+- Add exportable invoices and sales reports.
+- Add screenshots and a short demo video.
 
 ## Author
-**Mohammad Bilal**
+
+**Mohammad Bilal**  
 GitHub: [IslamBilal](https://github.com/IslamBilal)
