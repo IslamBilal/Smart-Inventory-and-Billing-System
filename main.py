@@ -37,4 +37,7 @@ def main_menu():
             print("Invalid choice. Please try again.")
         
 if __name__ == "__main__":
-    main_menu()
+    try:
+        main_menu()
+    finally:
+        conn.close()
